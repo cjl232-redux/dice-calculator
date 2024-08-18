@@ -1,0 +1,1 @@
+An extremely simple probability calculator for rolling arbitrary combinations of dice. This can be run from the command line and will output the results to the console and to a csv file. This requires any non-zero number of arguments, each of which should be in standard dice notation form (e.g., 3d6, d20, 20D2).
