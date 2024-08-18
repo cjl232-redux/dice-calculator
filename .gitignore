@@ -34,3 +34,6 @@
 # Output files
 *.csv
 *.ods
+
+# VSC folder
+.vscode
