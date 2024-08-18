@@ -30,6 +30,7 @@
 *.exe
 *.out
 *.app
+dice-calculator
 
 # Output files
 *.csv
