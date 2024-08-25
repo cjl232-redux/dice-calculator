@@ -138,13 +138,6 @@
           return result;
         }
 
-        function removeDice(event) {
-          const definitions = document.getElementById('dice-definitions');
-          if (definitions.querySelectorAll('.dice-definition').length > 1) {
-              this.closest('.dice-definition').remove();
-          }
-        }
-
         function updateOutput() {
           full_distribution.clear();
           let possible_outcome_count = 0;
@@ -182,6 +175,14 @@
             plot.data.datasets[0].data[i] /= possible_outcome_count;
           }
           plot.update();
+        }
+
+        function removeDice(event) {
+          const definitions = document.getElementById('dice-definitions');
+          if (definitions.querySelectorAll('.dice-definition').length > 1) {
+              this.closest('.dice-definition').remove();
+          }
+          updateOutput();
         }
 
         function addDice() {
