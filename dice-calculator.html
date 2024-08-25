@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Dice Calculator</title>
+    <style>
+      .flex-container {
+        display: flex;
+        width: 100%;
+        column-gap: 1em;
+      }
+      .control-panel {
+        padding-left: 5px;
+        padding-right: 5px;
+      }
+      .dice-input-row {
+        display: flex;
+        gap: 1em;
+        justify-content: space-between;
+      }
+      .output-area {
+        flex-grow: 1;
+      }
+    </style>
+    <script 
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" 
+      integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" 
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div class="flex-container">
+      <div class="control-panel">
+        <div id="dice-definitions">
+          <div class="dice-definition">
+            <h1 class="dice-name" contenteditable>Dice 1</h1>
+            <div class="dice-input-row">
+              <label>Weight</label>
+              <input class="dice-weight" type="number" min="0" value="1">
+            </div>
+            <div class="dice-input-row">
+              <label>Count</label>
+              <input class="dice-count" type="number" min="1" value="1">
+            </div>
+            <div class="dice-input-row">
+              <label>Sides</label>
+              <input class="dice-sides" type="number" min="1" value="6">
+            </div>
+            <div class="dice-input-row">
+              <label>Modifier</label>
+              <input class="dice-modifier" type="number">
+            </div>
+            <button type="button" class="remove-dice-button">Remove</button>
+          </div>
+        </div>
+        <br>
+        <button type="button" id="add-dice-button">Add Dice</button>
+      </div>
+      <div class="output-area">
+        <canvas id="output-plot"></canvas>
+      </div>
+    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('output-plot');
+        const plot = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'Probability',
+              data: [],
+              borderWidth: 1
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    return value.toLocaleString(
+                      undefined,
+                      {
+                        style: 'percent', 
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      },
+                    );
+                  }
+                }
+              }
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function(tooltip) {
+                    formatted_value = tooltip.parsed.y.toLocaleString(
+                      undefined,
+                      {
+                        style: 'percent', 
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      },
+                    );
+                    return 'Probability: ' + formatted_value;
+                  }
+                }
+              }
+            }
+          }
+        });
+        const full_distribution = new Map();
+
+        function calculateDistribution(count, sides) {
+          const result = new Map();
+          function recursiveSum(
+            sum_map,
+            current_depth,
+            cumulative_sum,
+          ) {
+            if (current_depth == count) {
+              for (let i = 1; i <= sides; i++) {
+                let final_sum = cumulative_sum + i;
+                if (!sum_map.has(final_sum)) {
+                  sum_map.set(final_sum, 1);
+                } else {
+                  sum_map.set(final_sum, sum_map.get(final_sum) + 1);
+                }
+              }
+            } else {
+              for (let i = 1; i <= sides; i++) {
+                recursiveSum(sum_map, current_depth + 1, cumulative_sum + i);
+              }
+            }
+          }
+          recursiveSum(result, 1, 0);
+          return result;
+        }
+
+        function removeDice(event) {
+          const definitions = document.getElementById('dice-definitions');
+          if (definitions.querySelectorAll('.dice-definition').length > 1) {
+              this.closest('.dice-definition').remove();
+          }
+        }
+
+        function updateOutput() {
+          full_distribution.clear();
+          let possible_outcome_count = 0;
+          document.querySelectorAll('.dice-definition').forEach(dice => {
+            let weight = Number(dice.querySelector('.dice-weight').value);
+            let count = Number(dice.querySelector('.dice-count').value);
+            let sides = dice.querySelector('.dice-sides').value;
+            if (count && sides && weight && Number(weight) > 0) {
+              count = Number(count);
+              sides = Number(sides);
+              weight = Number(weight);
+              let modifier = dice.querySelector('.dice-modifier').value;
+              if (!modifier) {
+                modifier = 0;
+              }
+              modifier = Number(modifier);
+              let dice_distribution = calculateDistribution(count, sides);
+              for (const [key, value] of dice_distribution.entries()) {
+                const weighted_value = value * weight;
+                if (!full_distribution.has(key + modifier)) {
+                  full_distribution.set(key + modifier, weighted_value);
+                } else {
+                  full_distribution.set(
+                    key + modifier,
+                    full_distribution.get(key + modifier) + weighted_value,
+                  );
+                }
+                possible_outcome_count += weighted_value;
+              }
+            }
+          });
+          plot.data.labels = Array.from(full_distribution.keys());
+          plot.data.datasets[0].data = Array.from(full_distribution.values());
+          for (let i = 0; i < plot.data.datasets[0].data.length; i++) {
+            plot.data.datasets[0].data[i] /= possible_outcome_count;
+          }
+          plot.update();
+        }
+
+        function addDice() {
+          const existing_element = document.querySelector(
+            '.dice-definition:last-child'
+          );
+          const clone = existing_element.cloneNode(true);
+          clone.querySelector('.dice-name').innerHTML = 'New Dice';
+          clone.querySelector('.dice-weight').setAttribute('value', '0');
+          clone.querySelector('.dice-count').setAttribute('value', '1');
+          clone.querySelector('.dice-sides').setAttribute('value', '6');
+          clone.querySelector('.dice-modifier').setAttribute('value', '');
+          const remove_button = clone.querySelector('.remove-dice-button');
+          remove_button.addEventListener('click', removeDice);
+          clone.querySelectorAll('input').forEach(input => {
+            input.addEventListener('change', updateOutput);
+
+          });
+          existing_element.after(clone);
+        }
+
+        function updateOutput() {
+          full_distribution.clear();
+          let possible_outcome_count = 0;
+          document.querySelectorAll('.dice-definition').forEach(dice => {
+            let weight = Number(dice.querySelector('.dice-weight').value);
+            let count = Number(dice.querySelector('.dice-count').value);
+            let sides = dice.querySelector('.dice-sides').value;
+            if (count && sides && weight && Number(weight) > 0) {
+              count = Number(count);
+              sides = Number(sides);
+              weight = Number(weight);
+              let modifier = dice.querySelector('.dice-modifier').value;
+              if (!modifier) {
+                modifier = 0;
+              }
+              modifier = Number(modifier);
+              let dice_distribution = calculateDistribution(count, sides);
+              for (const [key, value] of dice_distribution.entries()) {
+                const weighted_value = value * weight;
+                if (!full_distribution.has(key + modifier)) {
+                  full_distribution.set(key + modifier, weighted_value);
+                } else {
+                  full_distribution.set(
+                    key + modifier,
+                    full_distribution.get(key + modifier) + weighted_value,
+                  );
+                }
+                possible_outcome_count += weighted_value;
+              }
+            }
+          });
+          plot.data.labels = Array.from(full_distribution.keys());
+          plot.data.datasets[0].data = Array.from(full_distribution.values());
+          for (let i = 0; i < plot.data.datasets[0].data.length; i++) {
+            plot.data.datasets[0].data[i] /= possible_outcome_count;
+          }
+          plot.update();
+        }
+        document.getElementById('add-dice-button').addEventListener('click', addDice);
+        document.querySelectorAll('.remove-dice-button').forEach(button => {
+          button.addEventListener('click', removeDice);
+        });
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('change', updateOutput);
+        });
+        updateOutput();
+
+      })
+    </script>
+  </body>
+</html>
